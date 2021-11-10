@@ -1,0 +1,74 @@
+DATA SEGMENT
+STRING_A DB 10,13,'The School of Information and Engineering Shandong University',10,13,'$'
+INFO DB 'Press 1 to display in positive order,and press 2 to display in reverse order',10,13,'$'
+DATA ENDS
+
+EXT SEGMENT
+STRING_B DB 100 DUP('$')
+EXT ENDS
+
+STACKS SEGMENT
+DB 100 DUP(?)
+STACKS ENDS
+
+CODES SEGMENT
+ASSUME CS:CODES,DS:DATA,SS:STACKS,ES:EXT
+START:
+MOV AX,DATA
+MOV DS,AX
+MOV AX,EXT
+MOV ES,AX ;对段寄存器初始化
+LEA SI,STRING_A
+LEA DI,STRING_B ;SI指向源内存单元，DI指向目的内存单元
+CALL COPY ;实现字符串复制
+LEA DX,INFO
+MOV AH,09
+INT 21H
+MOV AH,07
+INT 21H
+CMP AL,31H
+JE POSITIVE ;实现分支，输入1显示正序，否则显示倒序
+JMP REVERSE
+QUIT2:
+MOV AH,4CH
+INT 21H
+
+COPY PROC NEAR
+NEXT1:
+MOV AL,DS:[SI]
+MOV ES:[DI],AL ;硬件原理上讲，指行一条指令必须经过CPU中的寄存器，不能直接在两内存之间传递
+INC SI
+INC DI
+MOV AL,DS:[SI]
+CMP AL,24H
+JE QUIT1 ;已复制位的下一位为'$'则已完成复制，可以退出子程序
+JMP NEXT1 ;否则继续复制下一位
+QUIT1:
+RET
+COPY ENDP
+
+POSITIVE:
+LEA DI,STRING_B
+ADD DI,2 ;为跳过一开始存入的10和13
+NEXT2:
+MOV DL,ES:[DI]
+MOV AH,02H
+INT 21H ;实现对当前所指字符的显示
+INC DI
+MOV AL,ES:[DI]
+CMP AL,24H
+JE QUIT2 ;已显示位的下一位为'$'则已完成显示，可以退出
+JMP NEXT2
+
+REVERSE:
+SUB DI,2
+NEXT3:
+DEC DI ;为跳过末尾的10,13,'$'
+MOV DL,ES:[DI]
+MOV AH,02H
+INT 21H ;显示当前位
+CMP DI,0
+JE QUIT2 ;已到最前则退出
+JMP NEXT3
+CODES ENDS
+END START

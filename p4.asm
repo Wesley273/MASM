@@ -1,0 +1,134 @@
+STACK SEGMENT
+DW 300 DUP(?)
+STACK ENDS
+
+DATA SEGMENT
+INFO1 DB 'Please enter the first number in dec form:',10,13,'$'
+INFO2 DB 'Please enter the second number in dec form:',10,13,'$'
+INFO3 DB 10,13,'The result is:',10,13,10,13,'$'
+BUF1 DB 300 DUP(?)
+BUF2 DB 300 DUP(?)
+DATA ENDS
+
+CODE SEGMENT
+ASSUME CS:CODE,DS:DATA,SS:STACK
+START:
+XOR BX,BX
+MOV AX,DATA
+MOV DS,AX
+MOV AX,STACK
+MOV SS,AX
+LEA DX,INFO1
+MOV AH,9H
+INT 21H ;对程序完成初始设置后输出提示
+CALL FIRSTNUM ;对输入的第一个数进行存储
+LEA DX,INFO2
+MOV AH,9H
+INT 21H
+CALL SECNUM ;对输入的第二个数进行存储
+LEA DX,INFO3
+MOV AH,9H
+INT 21H
+CALL SUM ;将两个数运用全加器原理相加并显示
+MOV AH,4CH
+INT 21H
+
+FIRSTNUM PROC NEAR
+N1:MOV AH,1
+INT 21H
+CMP AL,0DH
+JE QUIT1 ;若为回车则完成输入，返回主程序
+SUB AL,30H
+MOV [BUF1+SI],AL ;将ASCII转为数值存入BUF1数组
+INC SI
+JMP N1;重复输入并存储
+QUIT1: 
+DEC SI ;之所以减1，是为了让它指向第一个数的个位
+RET
+FIRSTNUM ENDP
+
+SECNUM PROC NEAR
+N2:MOV AH,1
+INT 21H
+CMP AL,0DH
+JE QUIT2
+SUB AL,30H
+MOV [BUF2+DI],AL ;与FIRSTNUM区别在于存在BUF2数组，指针为DI
+INC DI
+JMP N2
+QUIT2: 
+DEC DI
+RET
+SECNUM ENDP
+
+SUM PROC NEAR
+MOV AX,0FFFH ;设置一个判别是否完成加法的标志
+PUSH AX
+XOR AX,AX ;初始化AX
+NEXTSUM:
+MOV AL,BYTE PTR [SI+BUF1]
+ADD AH,BYTE PTR [DI+BUF2] ;使用ADD以保留来自低位的进位
+ADD AL,AH ;两数同权位与来自低位的进位相加
+CMP AL,10
+JGE OVER ;判断是否需要进位
+
+CMP SI,0 ;SI是否以指向第一个数的最高位（是否为0）
+JE IGN1
+DEC SI ;未指向最高位则指向高一位
+CMP DI,0 ;DI是否以指向第一个数的最高位（是否为0）
+JE IGN2
+IGN3:
+DEC DI ;未指向最高位则指向高一位
+JMP IGN4
+IGN2:
+MOV [DI+BUF2],0 ;上次加法做完DI若已指向最高位，则将最高位置0，防止影响后续运算
+IGN4:XOR AH,AH
+PUSH AX
+JMP NEXTSUM ;此时无进位，直接将该位相加结果入栈
+IGN1:
+MOV [SI+BUF1],0 ;与上同理
+CMP DI,0
+JNE IGN3
+XOR AH,AH
+PUSH AX
+JMP DISPLAY ;两数最高位已完成相加且无进位，入栈当前位结果后进入显示环节
+
+OVER:
+CMP SI,0
+JE IGNORE1
+DEC SI
+CMP DI,0
+JE IGNORE2
+IGNORE3:
+DEC DI
+JMP IGNORE4
+IGNORE2:
+MOV [DI+BUF2],0 ;从OVER标志至此，与(AL)<10情况时前几行的操作相同
+IGNORE4:XOR AH,AH
+SUB AL,0AH
+PUSH AX
+MOV AH,01H
+JMP NEXTSUM ;只要SI，DI中有一个不为0，则会将AL中的数减10后入栈，AH加1代表进位，继续高一位的处理
+IGNORE1:
+MOV [SI+BUF1],0
+CMP DI,0
+JNE IGNORE3 ;SI为0，DI非0时，将SI最高位置0
+SUB AL,0AH
+XOR AH,AH
+PUSH AX
+MOV AX,0001H
+PUSH AX ;两数最高位已完成相加且有进位，入栈当前位结果后再将0001入栈，进入显示环节
+
+DISPLAY:
+NEXDIS:POP DX
+CMP DX,0FFFH
+JE QUIT5 ;每一位逐个出栈，直到遇到结束标志停止
+ADD DL,30H ;实现数值转ASCII
+MOV AH,02H
+INT 21H
+JMP NEXDIS ;显示完一位继续下一位的显示
+QUIT5:RET
+SUM ENDP
+
+CODE ENDS
+END START
